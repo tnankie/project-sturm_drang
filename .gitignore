@@ -4,3 +4,5 @@ data\*
 /data/**
 \data\
 data\
+*.nn
+*.npy
