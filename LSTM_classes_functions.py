@@ -11,7 +11,7 @@ class MV_LSTM(torch.nn.Module):
         super(MV_LSTM, self).__init__()
         self.n_features = n_features
         self.seq_len = seq_length
-        self.n_hidden = 2 # number of hidden states orig 30
+        self.n_hidden = 30 # number of hidden states orig 30
         self.n_layers = 2 # number of LSTM layers (stacked)
     
         self.l_lstm = torch.nn.LSTM(input_size = n_features, 
