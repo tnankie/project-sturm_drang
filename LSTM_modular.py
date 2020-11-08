@@ -67,7 +67,7 @@ def split_sequences(sequences, n_steps):
         y.append(seq_y)
     return array(X), array(y)
 #%%
-n_timesteps = 200 # this is number of timesteps
+n_timesteps = 40 # this is number of timesteps was 200
 
 # # convert dataset into input/output
 # train_x, train_y = np.float32(d1.iloc[:69133,:-2].values), np.float32(d1.iloc[:69133,-2].values)
@@ -87,7 +87,7 @@ train_data = TensorDataset(torch.from_numpy(train_x), torch.from_numpy(train_y))
 test_data = TensorDataset(torch.from_numpy(test_x), torch.from_numpy(test_y))
 
 # dataloaders
-batch_size = 512
+batch_size = 1024
 
 # make sure the SHUFFLE your training data
 train_loader = DataLoader(train_data, shuffle=True, batch_size=batch_size)
@@ -109,7 +109,7 @@ print('Sample label: \n', sample_y)
 #%%
 # create NN
 n_features = 256 # this is number of parallel inputs
-n_timesteps = 200 # this is number of timesteps
+
 train_episodes = 20 # this is the number of epochs
 clip = 5 # gradient clipping
 from LSTM_classes_functions import MV_LSTM
