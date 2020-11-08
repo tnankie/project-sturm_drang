@@ -19,6 +19,7 @@ data = pd.read_csv("./03-05-19-V118/03-05-19_ch1.csv", header=15)
 
 # first problem - sychronise the data and target
 # step 1 build date time features for both datasets
+# Following code extracts the header (16 lines) from the data file  
 head = []
 with open("./03-05-19-V118/03-05-19_ch1.csv", "r") as file:
     count = 0
@@ -108,22 +109,22 @@ print(times.shape)
 #%%
 #data_all =  librosa.stft(t2, n_fft= 4096,  win_length = 2560)
 #%%
-import matplotlib.pyplot as plt
-import librosa.display as libd
+# import matplotlib.pyplot as plt
+# import librosa.display as libd
 
-fig, ax = plt.subplots()
+# fig, ax = plt.subplots()
 
-img = libd.specshow(librosa.amplitude_to_db(np.abs(data_fft),
+# img = libd.specshow(librosa.amplitude_to_db(np.abs(data_fft),
 
-                                                       ref=np.max),
+#                                                        ref=np.max),
 
-                               y_axis='linear', x_axis='time', sr=5120, ax=ax)
+#                                y_axis='linear', x_axis='time', sr=5120, ax=ax)
 
-ax.set_title('Power spectrogram')
+# ax.set_title('Power spectrogram')
 
-fig.colorbar(img, ax=ax, format="%+2.0f dB")
-#%%
-import pickle
+# fig.colorbar(img, ax=ax, format="%+2.0f dB")
+# #%%
+# import pickle
 #%%
 # pickle.dump(data_fft, open("fft.p", "wb"))
 
@@ -143,7 +144,7 @@ import pickle
 # mer = mer.dropna()
 
 #%%
-delta = data.iloc[:,0].diff()
+#delta = data.iloc[:,0].diff()
 del data
 #%%
 

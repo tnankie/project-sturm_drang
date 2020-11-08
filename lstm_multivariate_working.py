@@ -47,7 +47,7 @@ class MV_LSTM(torch.nn.Module):
 #%%
 import pandas as pd
 #sample_data = np.load("abs_np.npy")
-d1 = pd.read_csv("lstm_spectral_data.csv", index_col = 0)
+d1 = pd.read_csv("data\lstm_spectral_data.csv", index_col = 0)
 d1 = d1.iloc[:,:-1]
 d1 = d1.dropna()
 #%%
@@ -116,7 +116,7 @@ mv_net.cuda()
 criterion = torch.nn.MSELoss() # reduction='sum' created huge loss value
 optimizer = torch.optim.Adam(mv_net.parameters(), lr=1e-1)
 mv_net.cuda()
-train_episodes = 20
+train_episodes = 1
 batch_size = 512
 #%%
 xt= torch.from_numpy(Xx)
@@ -130,18 +130,18 @@ for t in range(train_episodes):
         
         x_batch = torch.tensor(inpt,dtype=torch.float32).cuda()    
         y_batch = torch.tensor(target,dtype=torch.float32).cuda()
-    
+        # print(x_batch.size(0))
         mv_net.init_hidden(x_batch.size(0))
     #    lstm_out, _ = mv_net.l_lstm(x_batch,nnet.hidden)    
     #    lstm_out.contiguous().view(x_batch.size(0),-1)
         output = mv_net(x_batch)
         # print("The output shape is: {}. The target is shape: {} \n ******".format(output.shape, y_batch.shape))
-        loss = criterion(output.view(-1), y_batch.view(-1))  
+        t_loss = criterion(output.view(-1), y_batch.view(-1))  
         
-        loss.backward()
+        t_loss.backward()
         optimizer.step()        
         optimizer.zero_grad() 
-    print('step : ' , t , 'loss : ' , loss.item())
+    print('step : ' , t , 'loss : ' , t_loss.item())
     
 # for b in range(0,len(Xx), batch_size):    
 #     print("batch index:", b, "len X:", len(Xx))

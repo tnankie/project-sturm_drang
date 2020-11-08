@@ -11,7 +11,7 @@ class MV_LSTM(torch.nn.Module):
         super(MV_LSTM, self).__init__()
         self.n_features = n_features
         self.seq_len = seq_length
-        self.n_hidden = 30 # number of hidden states
+        self.n_hidden = 2 # number of hidden states orig 30
         self.n_layers = 2 # number of LSTM layers (stacked)
     
         self.l_lstm = torch.nn.LSTM(input_size = n_features, 
@@ -21,7 +21,9 @@ class MV_LSTM(torch.nn.Module):
         # according to pytorch docs LSTM output is 
         # (batch_size,seq_len, num_directions * hidden_size)
         # when considering batch_first = True
-        self.l_linear = torch.nn.Linear(self.n_hidden*self.seq_len, 1)
+        self.l_linear1 = torch.nn.Linear(self.n_hidden*self.seq_len, 30)
+        self.l_linear2 = torch.nn.Linear(30, 30)
+        self.l_linear3 = torch.nn.Linear(30, 1)
         
     
     def init_hidden(self, batch_size):
@@ -39,8 +41,13 @@ class MV_LSTM(torch.nn.Module):
         # (batch_size,seq_len,num_directions * hidden_size)
         # for following linear layer we want to keep batch_size dimension and merge rest       
         # .contiguous() -> solves tensor compatibility error
+        m = torch.nn.ReLU()
         x = lstm_out.contiguous().view(batch_size,-1)
-        return self.l_linear(x)
+        x = self.l_linear1(x)
+        x = m(x)
+        x = self.l_linear2(x)
+        x = m(x)
+        return self.l_linear3(x)
     
 def split_sequences(sequences, n_steps):
     X, y = list(), list()
