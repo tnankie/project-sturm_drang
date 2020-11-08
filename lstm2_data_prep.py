@@ -13,15 +13,15 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import librosa
 
-target = pd.read_csv("snoops.csv")
+target = pd.read_csv("./data/snoops.csv")
 
-data = pd.read_csv("./03-05-19-V118/03-05-19_ch1.csv", header=15)
+data = pd.read_csv("./data/03-05-19-V118/03-05-19_ch2.csv", header=15)
 
 # first problem - sychronise the data and target
 # step 1 build date time features for both datasets
 # Following code extracts the header (16 lines) from the data file  
 head = []
-with open("./03-05-19-V118/03-05-19_ch1.csv", "r") as file:
+with open("./data/03-05-19-V118/03-05-19_ch2.csv", "r") as file:
     count = 0
     for line in file:
         if count > 16:
@@ -208,7 +208,7 @@ mer = pd.merge(d1, tt_3, how = "left", sort = True, left_index=True, right_index
 mer = mer.drop_duplicates()
 mer = mer.loc[str(tt_3.index[0]):str(tt_3.index[-1])]
 mer = mer.fillna(method="backfill")
-mer.to_csv("lstm_spectral_data.csv")
+mer.to_csv("./data/lstm_spectral_data_2.csv")
     
     
     

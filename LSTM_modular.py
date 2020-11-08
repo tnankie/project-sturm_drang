@@ -5,6 +5,7 @@ Created on Sat Nov  7 12:12:15 2020
 @author: work_cbdvl
 """
 import torch
+import seaborn as sns
 from LSTM_classes_functions import Dataset
 
 use_cuda = torch.cuda.is_available()
@@ -18,7 +19,7 @@ params = {'batch_size': 128,
 max_epochs = 100
 
 import pandas as pd
-d1 = pd.read_csv("data\lstm_spectral_data.csv", index_col = 0)
+d1 = pd.read_csv("data\lstm_spectral_data_2.csv", index_col = 0)
 d1 = d1.iloc[:,:-1]
 d1 = d1.dropna()
 cols = d1.columns
@@ -67,7 +68,7 @@ def split_sequences(sequences, n_steps):
         y.append(seq_y)
     return array(X), array(y)
 #%%
-n_timesteps = 40 # this is number of timesteps was 200
+n_timesteps = 8 # this is number of timesteps was 200
 
 # # convert dataset into input/output
 # train_x, train_y = np.float32(d1.iloc[:69133,:-2].values), np.float32(d1.iloc[:69133,-2].values)
@@ -87,7 +88,7 @@ train_data = TensorDataset(torch.from_numpy(train_x), torch.from_numpy(train_y))
 test_data = TensorDataset(torch.from_numpy(test_x), torch.from_numpy(test_y))
 
 # dataloaders
-batch_size = 1024
+batch_size = 8192
 
 # make sure the SHUFFLE your training data
 train_loader = DataLoader(train_data, shuffle=True, batch_size=batch_size)
@@ -110,20 +111,22 @@ print('Sample label: \n', sample_y)
 # create NN
 n_features = 256 # this is number of parallel inputs
 
-train_episodes = 20 # this is the number of epochs
-clip = 5 # gradient clipping
+train_episodes = 60 # this is the number of epochs
+clip = 10 # gradient clipping
 from LSTM_classes_functions import MV_LSTM
 mv_net = MV_LSTM(n_features,n_timesteps)
 if use_cuda:
     mv_net.cuda()
 criterion = torch.nn.MSELoss() # reduction='sum' created huge loss value
-optimizer = torch.optim.Adam(mv_net.parameters(), lr=1e-1)
+optimizer = torch.optim.Adam(mv_net.parameters(), lr=1e-3)
 if use_cuda:
     mv_net.cuda()
 print(mv_net)
 
 #%%
 mv_net.train()
+t_losses = []
+v_losses = []
 for t in range(train_episodes):
     for inputs, labels in train_loader:
         mv_net.train()
@@ -144,6 +147,8 @@ for t in range(train_episodes):
         optimizer.step()        
         optimizer.zero_grad() 
     print('step : ' , t , 'train loss : ' , t_loss.item())
+    t_losses.append(t_loss.item())
+    
     for test_in, test_lab in test_loader:
         mv_net.init_hidden(test_in.shape[0])
         mv_net.eval()
@@ -152,6 +157,13 @@ for t in range(train_episodes):
         test_out = mv_net(test_in)
         v_loss = criterion(test_out.view(-1), test_lab.view(-1))
     print('step : ' , t , 'test loss : ' , v_loss.item())
+    v_losses.append(v_loss.item())
+
+
+#%%
+x_val = np.arange(0,len(v_losses))
+sns.scatterplot(x=x_val, y=v_losses, color= "r")
+sns.scatterplot(x=x_val, y=t_losses, color= "b")
 #%%
 mv_net.train()
 # for t in range(train_episodes):

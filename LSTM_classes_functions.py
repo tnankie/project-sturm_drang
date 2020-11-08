@@ -6,12 +6,40 @@ Created on Sat Nov  7 12:03:48 2020
 """
 import torch
 import numpy as np
+class fc_net(torch.nn.Module):
+    def __init__(self, n_features):
+        super(fc_net, self).__init__()
+        self.n_features = n_features
+        self.n_hidden = 30 #512 original value
+        self.taper = 5 #30 original value
+        self.l_linear1 = torch.nn.Linear(self.n_features, self.n_hidden)
+        self.l_linear2 = torch.nn.Linear(self.n_hidden, self.n_hidden)
+        self.l_linear3 = torch.nn.Linear(self.n_hidden, self.n_hidden)
+        self.l_linear4 = torch.nn.Linear(self.n_hidden, self.taper)
+        self.l_linear5 = torch.nn.Linear(self.taper, 1)
+        
+    def forward(self, x):
+        m = torch.nn.Sigmoid()
+        x = self.l_linear1(x)
+        x = m(x)
+        x = self.l_linear2(x)
+        x = m(x)
+        x = self.l_linear3(x)
+        x = m(x)
+        x = self.l_linear4(x)
+        x = m(x)
+        x = self.l_linear5(x)
+        return x
+        
+        
+        
+    
 class MV_LSTM(torch.nn.Module):
     def __init__(self,n_features,seq_length):
         super(MV_LSTM, self).__init__()
         self.n_features = n_features
         self.seq_len = seq_length
-        self.n_hidden = 30 # number of hidden states orig 30
+        self.n_hidden = 128 # number of hidden states orig 30
         self.n_layers = 2 # number of LSTM layers (stacked)
     
         self.l_lstm = torch.nn.LSTM(input_size = n_features, 
@@ -41,7 +69,7 @@ class MV_LSTM(torch.nn.Module):
         # (batch_size,seq_len,num_directions * hidden_size)
         # for following linear layer we want to keep batch_size dimension and merge rest       
         # .contiguous() -> solves tensor compatibility error
-        m = torch.nn.ReLU()
+        m = torch.nn.Sigmoid()  # was relu
         x = lstm_out.contiguous().view(batch_size,-1)
         x = self.l_linear1(x)
         x = m(x)
@@ -58,7 +86,7 @@ def split_sequences(sequences, n_steps):
         if end_ix > len(sequences):
             break
         # gather input and output parts of the pattern
-        seq_x, seq_y = sequences[i:end_ix, :-2], sequences[end_ix-1, -2]
+        seq_x, seq_y = sequences[i:end_ix, :-1], sequences[end_ix-1, -1]
         X.append(seq_x)
         y.append(seq_y)
     return np.array(X), np.array(y)
