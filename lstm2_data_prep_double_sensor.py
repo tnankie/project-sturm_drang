@@ -15,13 +15,13 @@ import librosa
 
 target = pd.read_csv("./data/snoops.csv")
 
-data = pd.read_csv("./data/03-05-19-V118/03-05-19_ch2.csv", header=15)
+data = pd.read_csv("./data/03-05-19-V118/03-05-19_ch1.csv", header=15)
 
 # first problem - sychronise the data and target
 # step 1 build date time features for both datasets
 # Following code extracts the header (16 lines) from the data file  
 head = []
-with open("./data/03-05-19-V118/03-05-19_ch2.csv", "r") as file:
+with open("./data/03-05-19-V118/03-05-19_ch1.csv", "r") as file:
     count = 0
     for line in file:
         if count > 16:
@@ -80,27 +80,39 @@ tt_3 = tt_2.drop(['Date',
  ], axis= 1)
 
 tt_3 = tt_3.set_index("fixed")
+del target
 del tt_1
 del tt_2
 #%% 
 #now for the data
-data["micro4"] = pd.to_datetime(data["X:Time (s)"], unit = "s")
+# data["micro4"] = pd.to_datetime(data["X:Time (s)"], unit = "s")
 offset = pd.to_datetime(head[3][23:40])
 off2 = offset + pd.Timedelta(90, "s")
-check = pd.Timedelta((off2.to_pydatetime() - data.micro4[0].to_pydatetime()))
-data["dtime"] = data.micro4 + check
+off3 = off2.to_pydatetime()
+#%%
+# check = pd.Timedelta((off3 - data.micro4[0].to_pydatetime()))
+# data["dtime"] = data.micro4 + check
 
 # data = data.drop(["X:Time (s)"], axis =1)
-print(data.head())
+# print(data.head())
 # t1 = data["Y:g"]
 t2 = data["Y:g"].values
-
+del data
 #%%
 data_fft = librosa.stft(t2[:], n_fft= 4096,  win_length = 2560)
+data_2 = pd.read_csv("./data/03-05-19-V118/03-05-19_ch2.csv", header=15)
+data_2 = data_2["Y:g"].values
+data_2 = librosa.stft(data_2[:], n_fft= 4096,  win_length = 2560)
+#%%
+data_fft2 = np.concatenate((data_fft, data_2))
+
+del data_fft
+#%%
+del data_2
 del t2
 #%%
 # abs_data  = np.abs(data_fft)
-hop = 2560 // 4
+# hop = 2560 // 4
 #%%
 
 # times = data.loc[data["X:Time (s)"]% (1/8) < 1/5120,:]
@@ -115,16 +127,16 @@ hop = 2560 // 4
 
 # fig, ax = plt.subplots()
 
-# img = libd.specshow(librosa.amplitude_to_db(np.abs(data_fft),
+# img = libd.specshow(librosa.amplitude_to_db(np.abs(data_fft[:600,:]),
 
-#                                                        ref=np.max),
+#                                                         ref=np.max),
 
-#                                y_axis='linear', x_axis='time', sr=5120, ax=ax)
+#                                 y_axis='linear', x_axis='time', sr=5120, ax=ax)
 
 # ax.set_title('Power spectrogram')
 
 # fig.colorbar(img, ax=ax, format="%+2.0f dB")
-# #%%
+# # #%%
 # import pickle
 #%%
 # pickle.dump(data_fft, open("fft.p", "wb"))
@@ -146,25 +158,27 @@ hop = 2560 // 4
 
 #%%
 #delta = data.iloc[:,0].diff()
-del data
+
 #%%
 
 seconds = np.arange(0, 11660*5120, 5120)
 #%%
 print(librosa.frames_to_samples(1382401, hop_length=2560//4, n_fft=4096))
 #%%
-tran = np.abs(data_fft.T)
-del data_fft
+tran = np.abs(data_fft2.T)
+del data_fft2
+#%%
 new = np.zeros((tran.shape[0], 1))
-rows = np.arange(0, 2049, 8)
+rows = np.arange(0, tran.shape[1], 8)
 for c,v in enumerate(rows):
     
-    col = tran[:,v:min(v+8, 2048)]
+    col = tran[:,v:min(v+8, tran.shape[1])]
     #print(" slice begining{} and end{}".format(v, min(v+8, 2048)))
     col = np.mean(col, axis=1)
     new = np.hstack((new, col.reshape(-1,1)))
 new = new[:,1:-1]
 print(new[:5])
+#%%
 del tran
 del rows
 del col
@@ -200,16 +214,16 @@ print(new[:5])
 
 #%%
 d1 = pd.DataFrame(new)
-d1.iloc[:,256] = pd.to_datetime(d1.iloc[:,-1], unit = "s", origin =off2)
-d1.set_index(256, inplace=True)
-
+d1.iloc[:,-1] = pd.to_datetime(d1.iloc[:,-1], unit = "s", origin =off2)
+d1.set_index(d1.shape[1], inplace=True)
+del new
 #%%
 
 mer = pd.merge(d1, tt_3, how = "left", sort = True, left_index=True, right_index=True)
 mer = mer.drop_duplicates()
 mer = mer.loc[str(tt_3.index[0]):str(tt_3.index[-1])]
 mer = mer.fillna(method="backfill")
-mer.to_csv("./data/lstm_spectral_data_2.csv")
+mer.to_csv("./data/lstm_spectral_data_combined.csv")
     
     
     

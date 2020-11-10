@@ -49,7 +49,9 @@ class MV_LSTM(torch.nn.Module):
         # according to pytorch docs LSTM output is 
         # (batch_size,seq_len, num_directions * hidden_size)
         # when considering batch_first = True
+        self.drop1 = torch.nn.Dropout(0.5)
         self.l_linear1 = torch.nn.Linear(self.n_hidden*self.seq_len, 30)
+        self.drop2 = torch.nn.Dropout(0.5)
         self.l_linear2 = torch.nn.Linear(30, 30)
         self.l_linear3 = torch.nn.Linear(30, 1)
         
@@ -71,7 +73,9 @@ class MV_LSTM(torch.nn.Module):
         # .contiguous() -> solves tensor compatibility error
         m = torch.nn.Sigmoid()  # was relu
         x = lstm_out.contiguous().view(batch_size,-1)
+        x = self.drop1(x)
         x = self.l_linear1(x)
+        x = self.drop2(x)
         x = m(x)
         x = self.l_linear2(x)
         x = m(x)
