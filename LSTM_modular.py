@@ -19,7 +19,7 @@ params = {'batch_size': 128,
 max_epochs = 100
 
 import pandas as pd
-d1 = pd.read_csv("data\lstm_spectral_data_1.csv", index_col = 0)
+d1 = pd.read_csv(".\data\lstm_spectral_data_2.csv", index_col = 0)
 d1 = d1.iloc[:,:-1]
 d1 = d1.dropna()
 cols = d1.columns
