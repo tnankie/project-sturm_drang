@@ -81,6 +81,56 @@ class MV_LSTM(torch.nn.Module):
         x = m(x)
         return self.l_linear3(x)
     
+class MV_LSTM2(torch.nn.Module):
+    def __init__(self, vocab_size, n_features, seq_length, drop_prob=0.5):
+        super(MV_LSTM2, self).__init__()
+        self.n_features = n_features
+        self.seq_len = seq_length
+        self.n_hidden = 256 # number of hidden states orig 30
+        self.n_layers = 2 # number of LSTM layers (stacked)
+        self.embedding = torch.nn.Embedding(vocab_size, n_features)
+        self.l_lstm = torch.nn.LSTM(input_size = n_features, 
+                                 hidden_size = self.n_hidden,
+                                 num_layers = self.n_layers,
+                                 dropout=drop_prob,
+                                 batch_first = True, )
+        # according to pytorch docs LSTM output is 
+        # (batch_size,seq_len, num_directions * hidden_size)
+        # when considering batch_first = True
+        self.drop1 = torch.nn.Dropout(0.5)
+        self.l_linear1 = torch.nn.Linear(self.n_hidden*self.seq_len, 30)
+        self.drop2 = torch.nn.Dropout(0.5)
+        self.l_linear2 = torch.nn.Linear(30, 30)
+        self.l_linear3 = torch.nn.Linear(30, 1)
+        
+    
+    def init_hidden(self, batch_size):
+        # even with batch_first = True this remains same as docs
+        hidden_state = torch.zeros(self.n_layers,batch_size,self.n_hidden).cuda()
+        cell_state = torch.zeros(self.n_layers,batch_size,self.n_hidden).cuda()
+        self.hidden = (hidden_state, cell_state)
+    
+    
+    def forward(self, x):        
+        batch_size, seq_len, _ = x.size()
+        x = x.long()
+        embeds = self.embedding(x)
+        lstm_out, self.hidden = self.l_lstm(x,self.hidden)
+        # lstm_out(with batch_first = True) is 
+        # (batch_size,seq_len,num_directions * hidden_size)
+        # for following linear layer we want to keep batch_size dimension and merge rest       
+        # .contiguous() -> solves tensor compatibility error
+        m = torch.nn.Sigmoid()  # was relu
+        x = lstm_out.contiguous().view(batch_size,-1)
+        x = self.drop1(x)
+        x = self.l_linear1(x)
+        x = self.drop2(x)
+        x = m(x)
+        x = self.l_linear2(x)
+        x = m(x)
+        return self.l_linear3(x)
+    
+    
 def split_sequences(sequences, n_steps):
     X, y = list(), list()
     for i in range(len(sequences)):
