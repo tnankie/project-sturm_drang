@@ -128,6 +128,7 @@ mv_net.train()
 t_losses = []
 v_losses = []
 for t in range(train_episodes):
+    counter = 0
     for inputs, labels in train_loader:
         mv_net.train()
         
@@ -141,12 +142,13 @@ for t in range(train_episodes):
         output = mv_net(inputs)
         # print("The output shape is: {}. The target is shape: {} \n ******".format(output.shape, y_batch.shape))
         t_loss = criterion(output.view(-1), labels.view(-1))  
-        
+        print('counter : ' , counter , 'train loss : ' , t_loss.item())
         t_loss.backward()
         nn.utils.clip_grad_norm_(mv_net.parameters(), clip)
         optimizer.step()        
-        optimizer.zero_grad() 
-    # print('step : ' , t , 'train loss : ' , t_loss.item())
+        optimizer.zero_grad()
+        counter += 1
+    print('step : ' , t , 'train loss : ' , t_loss.item())
     t_losses.append(t_loss.item())
     
     for test_in, test_lab in test_loader:
@@ -156,7 +158,7 @@ for t in range(train_episodes):
             test_in, test_lab = test_in.cuda(), test_lab.cuda()
         test_out = mv_net(test_in)
         v_loss = criterion(test_out.view(-1), test_lab.view(-1))
-    # print('step : ' , t , 'test loss : ' , v_loss.item())
+    print('step : ' , t , 'test loss : ' , v_loss.item())
     v_losses.append(v_loss.item())
 
 
