@@ -191,24 +191,28 @@ class SentimentRNN(nn.Module):
         Perform a forward pass of our model on some input and hidden state.
         """
         batch_size = x.size(0)
-
+        print("step 1 shape x: {}".format(x.shape))
         # embeddings and lstm_out
         x = x.long()
+        print("step 2 shape x: {}".format(x.shape))
         embeds = self.embedding(x)
         lstm_out, hidden = self.lstm(embeds, hidden)
-    
+        print("lstm output: {}, hidden len: {}, hiden1: {}, hidden2: {}".format(lstm_out.shape, len(hidden), hidden[0].shape, hidden[1].shape))
         # stack up lstm outputs
         lstm_out = lstm_out.contiguous().view(-1, self.hidden_dim)
-        
+        print("pre fc: {}".format(lstm_out.shape))
         # dropout and fully-connected layer
         out = self.dropout(lstm_out)
         out = self.fc(out)
+        print("post fc: {}".format(out.shape))
         # sigmoid function
         sig_out = self.sig(out)
         
         # reshape to be batch_size first
         sig_out = sig_out.view(batch_size, -1)
+        print("post reshape: {}".format(sig_out.shape))
         sig_out = sig_out[:, -1] # get last batch of labels
+        print("post slice: {}".format(sig_out.shape))
         
         # return last sigmoid output and hidden state
         return sig_out, hidden
@@ -242,3 +246,156 @@ net2 = MV_LSTM2(vocab_size, embedding_dim, review_word_count)
 net = SentimentRNN(vocab_size, output_size, embedding_dim, hidden_dim, n_layers)
 print(net)
 print(net2)
+#%%
+# loss and optimization functions
+lr=0.001
+
+criterion = nn.BCELoss()
+optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+# %%
+# training params
+
+epochs = 4 # 3-4 is approx where I noticed the validation loss stop decreasing
+
+counter = 0
+print_every = 100
+clip=5 # gradient clipping
+
+# move model to GPU, if available
+if(train_on_gpu):
+    net.cuda()
+
+net.train()
+# train for some number of epochs
+for e in range(epochs):
+    # initialize hidden state
+    h = net.init_hidden(batch_size)
+
+    # batch loop
+    for inputs, labels in train_loader:
+        counter += 1
+
+        if(train_on_gpu):
+            inputs, labels = inputs.cuda(), labels.cuda()
+
+        # Creating new variables for the hidden state, otherwise
+        # we'd backprop through the entire training history
+        h = tuple([each.data for each in h])
+
+        # zero accumulated gradients
+        net.zero_grad()
+
+        # get the output from the model
+        output, h = net(inputs, h)
+        
+
+        # calculate the loss and perform backprop
+        loss = criterion(output.squeeze(), labels.float())
+        print("shape of loss: {}".format(loss.shape))
+        loss.backward()
+        # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
+        nn.utils.clip_grad_norm_(net.parameters(), clip)
+        optimizer.step()
+        break
+        # loss stats
+        if counter % print_every == 0:
+            # Get validation loss
+            val_h = net.init_hidden(batch_size)
+            val_losses = []
+            net.eval()
+            for inputs, labels in valid_loader:
+
+                # Creating new variables for the hidden state, otherwise
+                # we'd backprop through the entire training history
+                val_h = tuple([each.data for each in val_h])
+
+                if(train_on_gpu):
+                    inputs, labels = inputs.cuda(), labels.cuda()
+
+                output, val_h = net(inputs, val_h)
+                val_loss = criterion(output.squeeze(), labels.float())
+
+                val_losses.append(val_loss.item())
+
+            net.train()
+            print("Epoch: {}/{}...".format(e+1, epochs),
+                  "Step: {}...".format(counter),
+                  "Loss: {:.6f}...".format(loss.item()),
+                  "Val Loss: {:.6f}".format(np.mean(val_losses)))
+#%%
+# training params
+# net2 = MV_LSTM2(vocab_size, embedding_dim, review_word_count)
+print(net2)
+epochs = 4 # 3-4 is approx where I noticed the validation loss stop decreasing
+
+counter = 0
+print_every = 100
+clip=5 # gradient clipping
+
+# move model to GPU, if available
+if(train_on_gpu):
+    net2.cuda()
+
+net2.train()
+counter = 0
+# train for some number of epochs
+for e in range(epochs):
+    # initialize hidden state
+    h = net2.init_hidden(batch_size)
+
+    # batch loop
+    for inputs, labels in train_loader:
+        counter += 1
+
+        if(train_on_gpu):
+            inputs, labels = inputs.cuda(), labels.cuda()
+        # inputs = inputs.view(inputs.shape[0], inputs.shape[1], 1)
+        # Creating new variables for the hidden state, otherwise
+        # we'd backprop through the entire training history
+        h = tuple([each.data for each in h])
+
+        # zero accumulated gradients
+        net2.zero_grad()
+
+        # get the output from the model
+        output, h = net2(inputs)
+
+        # calculate the loss and perform backprop
+        loss2 = criterion(output.squeeze(), labels.float())
+        break
+        if counter == 0:
+            
+            loss2.backward(retain_graph=True)
+            counter += 1
+        else:
+            loss2.backward(retain_graph=True)
+        
+        # `clip_grad_norm` helps prevent the exploding gradient problem in RNNs / LSTMs.
+        nn.utils.clip_grad_norm_(net.parameters(), clip)
+        optimizer.step()
+
+        # loss stats
+        if counter % print_every == 0:
+            # Get validation loss
+            val_h = net2.init_hidden(batch_size)
+            val2_losses = []
+            net2.eval()
+            for inputs, labels in valid_loader:
+
+                # Creating new variables for the hidden state, otherwise
+                # we'd backprop through the entire training history
+                val_h = tuple([each.data for each in val_h])
+
+                if(train_on_gpu):
+                    inputs, labels = inputs.cuda(), labels.cuda()
+
+                output, val_h = net2(inputs, val_h)
+                val2_loss = criterion(output.squeeze(), labels.float())
+
+                val2_losses.append(val2_loss.item())
+
+            net.train()
+            print("Epoch: {}/{}...".format(e+1, epochs),
+                  "Step: {}...".format(counter),
+                  "Loss: {:.6f}...".format(loss2.item()),
+                  "Val Loss: {:.6f}".format(np.mean(val2_losses)))

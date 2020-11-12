@@ -88,7 +88,7 @@ train_data = TensorDataset(torch.from_numpy(train_x), torch.from_numpy(train_y))
 test_data = TensorDataset(torch.from_numpy(test_x), torch.from_numpy(test_y))
 
 # dataloaders
-batch_size = 8192
+batch_size = 16384
 
 # make sure the SHUFFLE your training data
 train_loader = DataLoader(train_data, shuffle=True, batch_size=batch_size)
@@ -107,18 +107,82 @@ print('Sample label size: ', sample_y.size()) # batch_size
 print('Sample label: \n', sample_y)
 
 
+# #%%
+# # create NN
+# n_features = 256 # this is number of parallel inputs
+
+# train_episodes = 30 # this is the number of epochs
+# clip = 10 # gradient clipping
+# from LSTM_classes_functions import MV_LSTM
+# mv_net = MV_LSTM(n_features,n_timesteps)
+# if use_cuda:
+#     mv_net.cuda()
+# criterion = torch.nn.MSELoss() # reduction='sum' created huge loss value
+# optimizer = torch.optim.Adam(mv_net.parameters(), lr=1e-3)
+# if use_cuda:
+#     mv_net.cuda()
+# print(mv_net)
+
+# #%%
+# mv_net.train()
+# t_losses = []
+# v_losses = []
+# for t in range(train_episodes):
+#     counter = 0
+#     for inputs, labels in train_loader:
+#         mv_net.train()
+        
+#         if use_cuda:
+#             inputs, labels = inputs.cuda(), labels.cuda()
+        
+    
+#         mv_net.init_hidden(inputs.shape[0])
+#     #    lstm_out, _ = mv_net.l_lstm(x_batch,nnet.hidden)    
+#     #    lstm_out.contiguous().view(x_batch.size(0),-1)
+#         output = mv_net(inputs)
+#         # print("The output shape is: {}. The target is shape: {} \n ******".format(output.shape, y_batch.shape))
+#         t_loss = criterion(output.view(-1), labels.view(-1))  
+#         print('counter : ' , counter , 'train loss : ' , t_loss.item())
+#         t_loss.backward()
+#         nn.utils.clip_grad_norm_(mv_net.parameters(), clip)
+#         optimizer.step()        
+#         optimizer.zero_grad()
+#         counter += 1
+#     print('step : ' , t , 'train loss : ' , t_loss.item())
+#     t_losses.append(t_loss.item())
+    
+#     for test_in, test_lab in test_loader:
+#         mv_net.init_hidden(test_in.shape[0])
+#         mv_net.eval()
+#         if use_cuda:
+#             test_in, test_lab = test_in.cuda(), test_lab.cuda()
+#         test_out = mv_net(test_in)
+#         v_loss = criterion(test_out.view(-1), test_lab.view(-1))
+#     print('step : ' , t , 'test loss : ' , v_loss.item())
+#     v_losses.append(v_loss.item())
+
+
+# #%%
+# x_val = np.arange(0,len(v_losses))
+# title = "class: {}, batchsize: {}, timesteps: {}, first hidden layer: {}".format(type(mv_net), batch_size, n_timesteps, mv_net.n_hidden )
+# sns.scatterplot(x=x_val, y=v_losses, color= "r")
+# sns.scatterplot(x=x_val, y=t_losses, color= "b").set_title(title)
+
+
+
+
 #%%
 # create NN
 n_features = 256 # this is number of parallel inputs
 
-train_episodes = 30 # this is the number of epochs
-clip = 10 # gradient clipping
-from LSTM_classes_functions import MV_LSTM
-mv_net = MV_LSTM(n_features,n_timesteps)
+train_episodes = 15 # this is the number of epochs
+clip = 5 # gradient clipping
+from LSTM_classes_functions import MV_LSTM3
+mv_net = MV_LSTM3(n_features,n_timesteps)
 if use_cuda:
     mv_net.cuda()
 criterion = torch.nn.MSELoss() # reduction='sum' created huge loss value
-optimizer = torch.optim.Adam(mv_net.parameters(), lr=1e-3)
+optimizer = torch.optim.Adam(mv_net.parameters(), lr=1e-2)
 if use_cuda:
     mv_net.cuda()
 print(mv_net)
@@ -167,6 +231,13 @@ x_val = np.arange(0,len(v_losses))
 title = "class: {}, batchsize: {}, timesteps: {}, first hidden layer: {}".format(type(mv_net), batch_size, n_timesteps, mv_net.n_hidden )
 sns.scatterplot(x=x_val, y=v_losses, color= "r")
 sns.scatterplot(x=x_val, y=t_losses, color= "b").set_title(title)
+
+
+
+
+
+
+
 
 #%%
 n_timesteps2 = 1 # this is number of timesteps was 200

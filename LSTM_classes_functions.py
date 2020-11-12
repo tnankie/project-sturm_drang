@@ -81,6 +81,56 @@ class MV_LSTM(torch.nn.Module):
         x = m(x)
         return self.l_linear3(x)
     
+class MV_LSTM3(torch.nn.Module):
+    def __init__(self,n_features,seq_length):
+        super(MV_LSTM3, self).__init__()
+        self.n_features = n_features
+        self.seq_len = seq_length
+        self.n_hidden = 128 # number of hidden states orig 30
+        self.n_layers = 2 # number of LSTM layers (stacked)
+    
+        self.l_lstm = torch.nn.LSTM(input_size = n_features, 
+                                 hidden_size = self.n_hidden,
+                                 num_layers = self.n_layers, 
+                                 batch_first = True)
+        # according to pytorch docs LSTM output is 
+        # (batch_size,seq_len, num_directions * hidden_size)
+        # when considering batch_first = True
+        self.drop1 = torch.nn.Dropout(0.5)
+        self.l_linear1 = torch.nn.Linear(self.n_hidden, 30) #changed in 3
+        self.drop2 = torch.nn.Dropout(0.5)
+        self.l_linear2 = torch.nn.Linear(30, 30)
+        self.l_linear3 = torch.nn.Linear(30, 1)
+        
+    
+    def init_hidden(self, batch_size):
+        # even with batch_first = True this remains same as docs
+        hidden_state = torch.zeros(self.n_layers,batch_size,self.n_hidden).cuda()
+        cell_state = torch.zeros(self.n_layers,batch_size,self.n_hidden).cuda()
+        self.hidden = (hidden_state, cell_state)
+    
+    
+    def forward(self, x):        
+        batch_size, seq_len, _ = x.size()
+        
+        lstm_out, self.hidden = self.l_lstm(x,self.hidden)
+        # lstm_out(with batch_first = True) is 
+        # (batch_size,seq_len,num_directions * hidden_size)
+        # for following linear layer we want to keep batch_size dimension and merge rest       
+        # .contiguous() -> solves tensor compatibility error
+        m = torch.nn.Sigmoid()  # was relu
+        x = lstm_out.contiguous().view(-1, self.n_hidden) # changed in 3
+        x = self.drop1(x)
+        x = self.l_linear1(x)
+        x = self.drop2(x)
+        x = m(x)
+        x = self.l_linear2(x)
+        x = m(x)
+        x =  self.l_linear3(x)
+        x = x.view(batch_size, -1) # new for 3
+        x = x[:, -1] # get last batch of labels, also new for 3
+        return x
+    
 class MV_LSTM2(torch.nn.Module):
     def __init__(self, vocab_size, n_features, seq_length, drop_prob=0.5):
         super(MV_LSTM2, self).__init__()
@@ -109,26 +159,42 @@ class MV_LSTM2(torch.nn.Module):
         hidden_state = torch.zeros(self.n_layers,batch_size,self.n_hidden).cuda()
         cell_state = torch.zeros(self.n_layers,batch_size,self.n_hidden).cuda()
         self.hidden = (hidden_state, cell_state)
+        return self.hidden
     
     
-    def forward(self, x):        
-        batch_size, seq_len, _ = x.size()
+    def forward(self, x):
+        try:        
+            batch_size, seq_len, _ = x.shape
+        except:
+            batch_size, seq_len = x.shape
         x = x.long()
         embeds = self.embedding(x)
-        lstm_out, self.hidden = self.l_lstm(x,self.hidden)
+        print("Embedding shape: {}".format(embeds.shape))
+        lstm_out, self.hidden = self.l_lstm(embeds, self.hidden)
+        # b = self.hidden
+        print("lstm_out shape: {}, hidden shape 1: {}, hidden shape 2: {}".format(lstm_out.shape, self.hidden[0].shape, self.hidden[1].shape))
         # lstm_out(with batch_first = True) is 
         # (batch_size,seq_len,num_directions * hidden_size)
         # for following linear layer we want to keep batch_size dimension and merge rest       
         # .contiguous() -> solves tensor compatibility error
         m = torch.nn.Sigmoid()  # was relu
         x = lstm_out.contiguous().view(batch_size,-1)
+        print("pre fc 1 dropout,  x shape: {}".format(x.shape))
         x = self.drop1(x)
+        print("post fc 1 dropout,  x shape: {}".format(x.shape))
         x = self.l_linear1(x)
+        print("pre fc 1 relu dropout,  x shape: {}".format(x.shape))
         x = self.drop2(x)
+        print("pre fc 1 relu,  x shape: {}".format(x.shape))
         x = m(x)
+        print("pre fc 2,  x shape: {}".format(x.shape))
         x = self.l_linear2(x)
+        print("pre fc 2 relu,  x shape: {}".format(x.shape))
         x = m(x)
-        return self.l_linear3(x)
+        print("pre fc 3,  x shape: {}".format(x.shape))
+        x = self.l_linear3(x)
+        print("post fc 3,  x shape: {}".format(x.shape))
+        return x, self.hidden
     
     
 def split_sequences(sequences, n_steps):
