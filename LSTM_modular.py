@@ -7,6 +7,8 @@ Created on Sat Nov  7 12:12:15 2020
 import torch
 import seaborn as sns
 from LSTM_classes_functions import Dataset
+import matplotlib.pyplot as plt
+torch.manual_seed(42)
 
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda:0" if use_cuda else "cpu")
@@ -25,9 +27,17 @@ d1 = d1.dropna()
 cols = d1.columns
 #%%
 from sklearn.preprocessing import RobustScaler
-scaler = RobustScaler().fit(d1)
-d1 = scaler.transform(d1)
-d1 = pd.DataFrame(d1, columns = cols)
+dy = d1.iloc[:,-2:]
+dd = d1.iloc[:,:-2]
+scaler = RobustScaler().fit(dd)
+d1 = scaler.transform(dd)
+d1 = pd.DataFrame(d1, columns = cols[:-2])
+d1["vel"] = dy["Actual Velocity"].values
+d1["Track Section"] = dy["Track Section"].values
+#%%
+del dd
+del dy
+#%%
 tracks = {}
 count = 0
 for c,v in enumerate(d1["Track Section"].values):
@@ -76,6 +86,17 @@ n_timesteps = 8 # this is number of timesteps was 200
 # del d1
 train_x, train_y = split_sequences(np.float32(d1.iloc[:69133,:-1].values), n_timesteps)
 test_x, test_y = split_sequences(np.float32(d1.iloc[69133:,:-1].values), n_timesteps)
+#%%
+plotting = d1.copy()
+plotting["data"] = "train"
+plotting.iloc[69133:, -1] = "test"
+#%%
+sns.displot(data = plotting, x="vel", kind = "ecdf", hue="data")
+plt.show()
+sns.displot(data = plotting, x="vel", kind = "kde", hue="data")
+plt.show()
+sns.displot(data = plotting, x="vel", kind = "hist", hue="data")
+plt.show()
 
 # print(Xx.shape, yy.shape)
 #%%
@@ -88,7 +109,7 @@ train_data = TensorDataset(torch.from_numpy(train_x), torch.from_numpy(train_y))
 test_data = TensorDataset(torch.from_numpy(test_x), torch.from_numpy(test_y))
 
 # dataloaders
-batch_size = 8192
+batch_size = 2 ** 13
 
 # make sure the SHUFFLE your training data
 train_loader = DataLoader(train_data, shuffle=True, batch_size=batch_size)
@@ -111,7 +132,7 @@ print('Sample label: \n', sample_y)
 # create NN
 n_features = 256 # this is number of parallel inputs
 
-train_episodes = 30 # this is the number of epochs
+train_episodes = 200 # this is the number of epochs
 clip = 10 # gradient clipping
 from LSTM_classes_functions import MV_LSTM
 mv_net = MV_LSTM(n_features,n_timesteps)
@@ -146,7 +167,7 @@ for t in range(train_episodes):
         nn.utils.clip_grad_norm_(mv_net.parameters(), clip)
         optimizer.step()        
         optimizer.zero_grad() 
-    # print('step : ' , t , 'train loss : ' , t_loss.item())
+    print('step : ' , t , 'train loss : ' , t_loss.item())
     t_losses.append(t_loss.item())
     
     for test_in, test_lab in test_loader:
@@ -156,15 +177,16 @@ for t in range(train_episodes):
             test_in, test_lab = test_in.cuda(), test_lab.cuda()
         test_out = mv_net(test_in)
         v_loss = criterion(test_out.view(-1), test_lab.view(-1))
-    # print('step : ' , t , 'test loss : ' , v_loss.item())
+    print('step : ' , t , 'test loss : ' , v_loss.item())
     v_losses.append(v_loss.item())
 
 
-#%%
+
 x_val = np.arange(0,len(v_losses))
 title = "class: {}, batchsize: {}, timesteps: {}, first hidden layer: {}".format(type(mv_net), batch_size, n_timesteps, mv_net.n_hidden )
 sns.scatterplot(x=x_val, y=v_losses, color= "r")
 sns.scatterplot(x=x_val, y=t_losses, color= "b").set_title(title)
+plt.show()
 
 #%%
 n_timesteps2 = 1 # this is number of timesteps was 200
@@ -187,7 +209,7 @@ train_data = TensorDataset(torch.from_numpy(train_x), torch.from_numpy(train_y))
 test_data = TensorDataset(torch.from_numpy(test_x), torch.from_numpy(test_y))
 
 # dataloaders
-batch_size2 = 90000
+batch_size2 = 2048
 
 # make sure the SHUFFLE your training data
 train_loader = DataLoader(train_data, shuffle=True, batch_size=batch_size2)
@@ -210,14 +232,14 @@ print('Sample label: \n', sample_y)
 # create NN
 n_features = 256 # this is number of parallel inputs
 
-train_episodes = 300 # this is the number of epochs
+train_episodes = 200 # this is the number of epochs
 clip = 10 # gradient clipping
 from LSTM_classes_functions import fc_net
 mv_net2 = fc_net(n_features)
 if use_cuda:
     mv_net2.cuda()
 criterion2 = torch.nn.MSELoss() # reduction='sum' created huge loss value
-optimizer2 = torch.optim.Adam(mv_net2.parameters(), lr=1e-3)
+optimizer2 = torch.optim.Adam(mv_net2.parameters(), lr=1e-1)
 if use_cuda:
     mv_net2.cuda()
 print(mv_net2)
@@ -241,12 +263,13 @@ for t in range(train_episodes):
         # print("The output shape is: {}. The target is shape: {} \n ******".format(output.shape, y_batch.shape))
         t_loss2 = criterion2(output.view(-1), labels.view(-1))
         tb_losses2.append(t_loss2.item())
-        optimizer2.zero_grad() #?????
+        
         t_loss2.backward()
         # nn.utils.clip_grad_norm_(mv_net2.parameters(), clip)
-        optimizer2.step()        
+        optimizer2.step()
+        optimizer2.zero_grad() #?????        
         
-    # print('step : ' , t , 'train loss : ' , t_loss2.item())
+    print('step : ' , t , 'train loss : ' , t_loss2.item())
     t_losses2.append(t_loss2.item())
     
     mv_net2.eval()
@@ -257,7 +280,7 @@ for t in range(train_episodes):
             test_in, test_lab = test_in.cuda(), test_lab.cuda()
         test_out = mv_net2(test_in)
         v_loss = criterion2(test_out.view(-1), test_lab.view(-1))
-    # print('step : ' , t , 'test loss : ' , v_loss.item())
+    print('step : ' , t , 'test loss : ' , v_loss.item())
     v_losses2.append(v_loss.item())
 
 
@@ -269,20 +292,21 @@ title = "class: {}, batchsize: {}, timesteps: {}, first hidden layer: {}".format
 # sns.scatterplot(x=x_val, y=t_losses2, color= "b").set_title(title)
 check = pd.DataFrame({"train_loss": t_losses2, "test_loss":v_losses2})
 sns.scatterplot(data=check).set_title(title)
+plt.show()
 
 
 #%%
 # create NN
 n_features = 256 # this is number of parallel inputs
 
-train_episodes = 500 # this is the number of epochs
+train_episodes = 300 # this is the number of epochs
 clip = 10 # gradient clipping
 from LSTM_classes_functions import fc_net
 mv_net3 = fc_net(n_features)
 if use_cuda:
     mv_net3.cuda()
 criterion3 = torch.nn.MSELoss() # reduction='sum' created huge loss value
-optimizer3 = torch.optim.Adam(mv_net3.parameters(), lr=1e-3)
+optimizer3 = torch.optim.Adam(mv_net3.parameters(), lr=1e-1)
 if use_cuda:
     mv_net3.cuda()
 print(mv_net3)
@@ -300,17 +324,17 @@ for t in range(train_episodes):
         inputs, labels = torch.from_numpy(np.float32(d1.iloc[:69133,:-2].values)).cuda(), torch.from_numpy(np.float32(d1.iloc[:69133,-2].values)).cuda()
         
     
-      
+    optimizer3.zero_grad()  
     output = mv_net3(inputs)
         # print("The output shape is: {}. The target is shape: {} \n ******".format(output.shape, y_batch.shape))
     t_loss3 = criterion3(output.view(-1), labels.view(-1))
     tb_losses3.append(t_loss3.item())
-    optimizer3.zero_grad() #?????
+     #?????
     t_loss3.backward()
         # nn.utils.clip_grad_norm_(mv_net2.parameters(), clip)
     optimizer3.step()        
         
-    # print('step : ' , t , 'train loss : ' , t_loss2.item())
+    print('step : ' , t , 'train loss : ' , t_loss3.item())
     t_losses3.append(t_loss3.item())
     
     mv_net3.eval()
@@ -320,7 +344,7 @@ for t in range(train_episodes):
          test_in, test_lab = torch.from_numpy(np.float32(d1.iloc[69133:,:-2].values)).cuda(), torch.from_numpy(np.float32(d1.iloc[69133:,-2].values)).cuda()
     test_out = mv_net3(test_in)
     v_loss = criterion3(test_out.view(-1), test_lab.view(-1))
-    # print('step : ' , t , 'test loss : ' , v_loss.item())
+    print('step : ' , t , 'test loss : ' , v_loss.item())
     v_losses3.append(v_loss.item())
 
 
@@ -332,6 +356,201 @@ title = "class: {}, batchsize: {}, timesteps: {}, first hidden layer: {}".format
 # sns.scatterplot(x=x_val, y=t_losses2, color= "b").set_title(title)
 check = pd.DataFrame({"train_loss": t_losses3, "test_loss":v_losses3})
 sns.scatterplot(data=check).set_title(title)
+plt.show()
+
+
+#%%
+
+# Parameters
+
+d2 = pd.read_csv(".\data\lstm_spectral_data.csv", index_col = 0)
+d2 = d2.iloc[:,:-1]
+d2 = d2.dropna()
+cols = d2.columns
+#%%
+
+dy = d2.iloc[:,-2:]
+dd = d2.iloc[:,:-2]
+
+d2 = scaler.transform(dd)
+d2 = pd.DataFrame(d2, columns = cols[:-2])
+d2["vel"] = dy["Actual Velocity"].values
+d2["Track Section"] = dy["Track Section"].values
+#%%
+del dd
+del dy
+#%%
+tracks = {}
+count = 0
+for c,v in enumerate(d2["Track Section"].values):
+    if v in tracks.keys():
+        pass
+    else:
+        tracks[v] = count
+        count += 1
+
+d2 = d2.rename(columns={"Track Section": "trasec"})
+d2["tr"] = d2.apply(lambda x: tracks[x.trasec], axis=1)
+d2 = d2.drop("trasec", axis =1)
+
+del tracks 
+
+#%%
+n_timesteps2 = 1 # this is number of timesteps was 200
+
+
+val_x, val_y = split_sequences(np.float32(d2.iloc[:,:-1].values), n_timesteps2)
+
+
+#%%
+
+
+#%%
+# obtain one batch of training data
+dataiter = iter(val_loader)
+sample_x, sample_y = dataiter.next()
+
+print('Sample input size: ', sample_x.size()) # batch_size, seq_length
+print('Sample input: \n', sample_x)
+print()
+print('Sample label size: ', sample_y.size()) # batch_size
+print('Sample label: \n', sample_y)
+
+#%%
+del dataiter
+del sample_x
+del sample_y
+del test_loader
+del train_loader
+del test_data
+del train_data
+
+
+#%%
+torch.cuda.empty_cache()
+torch.cuda.ipc_collect()
+predict = []
+mv_net2.eval()
+inputs = torch.from_numpy(np.float32(d2.iloc[:,:-2].values)).cuda()
+val_out = mv_net2(inputs)
+         # v_loss = criterion2(val_out.view(-1), labels.view(-1))
+predict.append(val_out.detach().to("cpu"))
+
+#%%
+
+
+#%%
+
+#setting up for LSTM validation
+#%%
+
+# Parameters
+
+d2 = pd.read_csv(".\data\lstm_spectral_data.csv", index_col = 0)
+d2 = d2.iloc[:,:-1]
+d2 = d2.dropna()
+cols = d2.columns
+#%%
+
+dy = d2.iloc[:,-2:]
+dd = d2.iloc[:,:-2]
+
+d2 = scaler.transform(dd)
+d2 = pd.DataFrame(d2, columns = cols[:-2])
+d2["vel"] = dy["Actual Velocity"].values
+d2["Track Section"] = dy["Track Section"].values
+#%%
+del dd
+del dy
+#%%
+tracks = {}
+count = 0
+for c,v in enumerate(d2["Track Section"].values):
+    if v in tracks.keys():
+        pass
+    else:
+        tracks[v] = count
+        count += 1
+
+d2 = d2.rename(columns={"Track Section": "trasec"})
+d2["tr"] = d2.apply(lambda x: tracks[x.trasec], axis=1)
+d2 = d2.drop("trasec", axis =1)
+
+del tracks 
+
+#%%
+n_timesteps2 = 8 # this is number of timesteps was 200
+
+
+val_x, val_y = split_sequences(np.float32(d2.iloc[:,:-1].values), n_timesteps2)
+
+
+
+
+#%%
+import torch
+from torch.utils.data import TensorDataset, DataLoader
+
+# create Tensor datasets
+val_data = TensorDataset(torch.from_numpy(val_x), torch.from_numpy(val_y))
+
+
+
+# dataloaders
+batch_size = 2 ** 13
+
+# make sure the SHUFFLE your training data
+val_loader = DataLoader(val_data, shuffle=False, batch_size=batch_size)
+
+
+
+#%%
+# obtain one batch of training data
+dataiter = iter(val_loader)
+sample_x, sample_y = dataiter.next()
+
+print('Sample input size: ', sample_x.size()) # batch_size, seq_length
+print('Sample input: \n', sample_x)
+print()
+print('Sample label size: ', sample_y.size()) # batch_size
+print('Sample label: \n', sample_y)
+#%%
+del dataiter
+del sample_x
+del sample_y
+del test_loader
+del train_loader
+del test_data
+del train_data
+
+
+#%%
+torch.cuda.empty_cache()
+torch.cuda.ipc_collect()
+predict = []
+val_losses = []
+mv_net.eval()
+
+for inputs, labels in val_loader:
+        
+        
+        if use_cuda:
+            inputs, labels = inputs.cuda(), labels.cuda()
+        
+    
+        mv_net.init_hidden(inputs.shape[0])
+        output = mv_net(inputs)
+        # print("The output shape is: {}. The target is shape: {} \n ******".format(output.shape, y_batch.shape))
+        t_loss = criterion(output.view(-1), labels.view(-1))
+        val_losses.append(t_loss.item())
+        predict.append(output.detach().to("cpu"))
+     
+        
+   
+
+
+
+
 #%%
 mv_net.train()
 # for t in range(train_episodes):

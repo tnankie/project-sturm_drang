@@ -10,7 +10,7 @@ class fc_net(torch.nn.Module):
     def __init__(self, n_features):
         super(fc_net, self).__init__()
         self.n_features = n_features
-        self.n_hidden = 30 #512 original value
+        self.n_hidden = 128 #512 original value
         self.taper = 5 #30 original value
         self.l_linear1 = torch.nn.Linear(self.n_features, self.n_hidden)
         self.l_linear2 = torch.nn.Linear(self.n_hidden, self.n_hidden)
@@ -19,7 +19,7 @@ class fc_net(torch.nn.Module):
         self.l_linear5 = torch.nn.Linear(self.taper, 1)
         
     def forward(self, x):
-        m = torch.nn.Sigmoid()
+        m = torch.nn.ReLU()
         x = self.l_linear1(x)
         x = m(x)
         x = self.l_linear2(x)
@@ -39,7 +39,7 @@ class MV_LSTM(torch.nn.Module):
         super(MV_LSTM, self).__init__()
         self.n_features = n_features
         self.seq_len = seq_length
-        self.n_hidden = 128 # number of hidden states orig 30
+        self.n_hidden = 30 # number of hidden states orig 30
         self.n_layers = 2 # number of LSTM layers (stacked)
     
         self.l_lstm = torch.nn.LSTM(input_size = n_features, 

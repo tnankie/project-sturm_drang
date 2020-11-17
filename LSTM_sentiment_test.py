@@ -128,7 +128,7 @@ valid_data = TensorDataset(torch.from_numpy(val_x), torch.from_numpy(val_y))
 test_data = TensorDataset(torch.from_numpy(test_x), torch.from_numpy(test_y))
 
 # dataloaders
-batch_size = 50
+batch_size = 30
 
 # make sure the SHUFFLE your training data
 train_loader = DataLoader(train_data, shuffle=True, batch_size=batch_size)
