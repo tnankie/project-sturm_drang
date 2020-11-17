@@ -8,6 +8,7 @@ import torch
 import seaborn as sns
 from LSTM_classes_functions import Dataset
 import matplotlib.pyplot as plt
+import numpy as np
 torch.manual_seed(42)
 
 use_cuda = torch.cuda.is_available()
@@ -25,19 +26,19 @@ d1 = pd.read_csv(".\data\lstm_spectral_data_2.csv", index_col = 0)
 d1 = d1.iloc[:,:-1]
 d1 = d1.dropna()
 cols = d1.columns
-#%%
+
 from sklearn.preprocessing import RobustScaler
 dy = d1.iloc[:,-2:]
 dd = d1.iloc[:,:-2]
 scaler = RobustScaler().fit(dd)
-d1 = scaler.transform(dd)
+d1 = np.log(scaler.transform(dd)+1)
 d1 = pd.DataFrame(d1, columns = cols[:-2])
 d1["vel"] = dy["Actual Velocity"].values
 d1["Track Section"] = dy["Track Section"].values
-#%%
+
 del dd
 del dy
-#%%
+
 tracks = {}
 count = 0
 for c,v in enumerate(d1["Track Section"].values):
@@ -52,8 +53,8 @@ d1["tr"] = d1.apply(lambda x: tracks[x.trasec], axis=1)
 d1 = d1.drop("trasec", axis =1)
 
 del tracks 
+d1 = d1.loc[d2.vel < 90]
 
-#%%
 import random
 import numpy as np
 import torch
@@ -209,7 +210,7 @@ train_data = TensorDataset(torch.from_numpy(train_x), torch.from_numpy(train_y))
 test_data = TensorDataset(torch.from_numpy(test_x), torch.from_numpy(test_y))
 
 # dataloaders
-batch_size2 = 2048
+batch_size2 = 2 ** 15
 
 # make sure the SHUFFLE your training data
 train_loader = DataLoader(train_data, shuffle=True, batch_size=batch_size2)
@@ -232,7 +233,7 @@ print('Sample label: \n', sample_y)
 # create NN
 n_features = 256 # this is number of parallel inputs
 
-train_episodes = 200 # this is the number of epochs
+train_episodes = 50 # this is the number of epochs
 clip = 10 # gradient clipping
 from LSTM_classes_functions import fc_net
 mv_net2 = fc_net(n_features)
@@ -367,7 +368,7 @@ d2 = pd.read_csv(".\data\lstm_spectral_data.csv", index_col = 0)
 d2 = d2.iloc[:,:-1]
 d2 = d2.dropna()
 cols = d2.columns
-#%%
+
 
 dy = d2.iloc[:,-2:]
 dd = d2.iloc[:,:-2]
@@ -376,10 +377,10 @@ d2 = scaler.transform(dd)
 d2 = pd.DataFrame(d2, columns = cols[:-2])
 d2["vel"] = dy["Actual Velocity"].values
 d2["Track Section"] = dy["Track Section"].values
-#%%
+
 del dd
 del dy
-#%%
+
 tracks = {}
 count = 0
 for c,v in enumerate(d2["Track Section"].values):
@@ -394,18 +395,17 @@ d2["tr"] = d2.apply(lambda x: tracks[x.trasec], axis=1)
 d2 = d2.drop("trasec", axis =1)
 
 del tracks 
+d2 = d2.loc[d2.vel < 90]
 
-#%%
 n_timesteps2 = 1 # this is number of timesteps was 200
 
 
 val_x, val_y = split_sequences(np.float32(d2.iloc[:,:-1].values), n_timesteps2)
 
 
-#%%
 
 
-#%%
+
 # obtain one batch of training data
 dataiter = iter(val_loader)
 sample_x, sample_y = dataiter.next()
@@ -436,8 +436,24 @@ val_out = mv_net2(inputs)
          # v_loss = criterion2(val_out.view(-1), labels.view(-1))
 predict.append(val_out.detach().to("cpu"))
 
-#%%
 
+
+
+
+a = predict[0].numpy()
+
+
+d2["pred_lin"] = a
+
+
+sns.displot(data = d2, x="pred_lin", kind = "hist")
+sns.displot(data = d2, x="vel", kind = "hist")
+sns.displot(data = d2, x="pred_lin", kind = "ecdf")
+sns.displot(data = d2, x="vel", kind = "ecdf")
+plt.show()
+sns.scatterplot(data=d2, x="vel", y = "pred_lin")
+plt.show()
+   
 
 #%%
 
@@ -450,19 +466,20 @@ d2 = pd.read_csv(".\data\lstm_spectral_data.csv", index_col = 0)
 d2 = d2.iloc[:,:-1]
 d2 = d2.dropna()
 cols = d2.columns
-#%%
+
 
 dy = d2.iloc[:,-2:]
 dd = d2.iloc[:,:-2]
 
 d2 = scaler.transform(dd)
+d2 = np.log(scaler.transform(dd)+1)
 d2 = pd.DataFrame(d2, columns = cols[:-2])
 d2["vel"] = dy["Actual Velocity"].values
 d2["Track Section"] = dy["Track Section"].values
-#%%
+
 del dd
 del dy
-#%%
+
 tracks = {}
 count = 0
 for c,v in enumerate(d2["Track Section"].values):
@@ -477,17 +494,17 @@ d2["tr"] = d2.apply(lambda x: tracks[x.trasec], axis=1)
 d2 = d2.drop("trasec", axis =1)
 
 del tracks 
-
-#%%
-n_timesteps2 = 8 # this is number of timesteps was 200
-
-
-val_x, val_y = split_sequences(np.float32(d2.iloc[:,:-1].values), n_timesteps2)
+d2 = d2.loc[d2.vel < 90]
 
 
 
 
-#%%
+val_x, val_y = split_sequences(np.float32(d2.iloc[:,:-1].values), n_timesteps)
+
+
+
+
+
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 
@@ -504,7 +521,7 @@ val_loader = DataLoader(val_data, shuffle=False, batch_size=batch_size)
 
 
 
-#%%
+
 # obtain one batch of training data
 dataiter = iter(val_loader)
 sample_x, sample_y = dataiter.next()
@@ -514,7 +531,7 @@ print('Sample input: \n', sample_x)
 print()
 print('Sample label size: ', sample_y.size()) # batch_size
 print('Sample label: \n', sample_y)
-#%%
+
 del dataiter
 del sample_x
 del sample_y
@@ -545,12 +562,158 @@ for inputs, labels in val_loader:
         val_losses.append(t_loss.item())
         predict.append(output.detach().to("cpu"))
      
+#%%
+a = np.zeros((7,1))
+for i in np.arange(0,len(predict)):
+    a = np.concatenate((a, predict[i].numpy()), axis=0)
+#%%
+d2["pred_lstm"] = a
+b = d2.iloc[7,-1]
+
+d2.iloc[0:6,-1] = b
+#%%
+sns.displot(data = d2, x="pred_lstm", kind = "hist")
+sns.displot(data = d2, x="vel", kind = "hist")
+sns.displot(data = d2, x="pred_lstm", kind = "ecdf")
+sns.displot(data = d2, x="vel", kind = "ecdf")
+plt.show()
+sns.scatterplot(data=d2, x="vel", y = "pred_lstm", alpha=0.05, s=2)
+plt.show()
+x_vals = np.arange(0, len(d2))
+sns.scatterplot(x=x_vals, y=d2.vel, color = "r")
+sns.scatterplot(x=x_vals, y=d2.pred_lstm, color = "b")      
+plt.show()
+
+
+
+#%%
+
+# Parameters
+
+# d2 = pd.read_csv(".\data\lstm_spectral_data.csv", index_col = 0)
+# d2 = d2.iloc[:,:-1]
+# d2 = d2.dropna()
+# cols = d2.columns
+
+
+# dy = d2.iloc[:,-2:]
+# dd = d2.iloc[:,:-2]
+
+# d2 = scaler.transform(dd)
+# d2 = pd.DataFrame(d2, columns = cols[:-2])
+# d2["vel"] = dy["Actual Velocity"].values
+# d2["Track Section"] = dy["Track Section"].values
+
+# del dd
+# del dy
+
+# tracks = {}
+# count = 0
+# for c,v in enumerate(d2["Track Section"].values):
+#     if v in tracks.keys():
+#         pass
+#     else:
+#         tracks[v] = count
+#         count += 1
+
+# d2 = d2.rename(columns={"Track Section": "trasec"})
+# d2["tr"] = d2.apply(lambda x: tracks[x.trasec], axis=1)
+# d2 = d2.drop("trasec", axis =1)
+
+# del tracks 
+# d2 = d2.loc[d2.vel < 90]
+
+
+
+
+val_x, val_y = split_sequences(np.float32(d1.iloc[:,:-1].values), n_timesteps)
+
+
+
+
+
+import torch
+from torch.utils.data import TensorDataset, DataLoader
+
+# create Tensor datasets
+val_data = TensorDataset(torch.from_numpy(val_x), torch.from_numpy(val_y))
+
+
+
+# dataloaders
+batch_size = 2 ** 13
+
+# make sure the SHUFFLE your training data
+val_loader = DataLoader(val_data, shuffle=False, batch_size=batch_size)
+
+
+
+
+# obtain one batch of training data
+dataiter = iter(val_loader)
+sample_x, sample_y = dataiter.next()
+
+print('Sample input size: ', sample_x.size()) # batch_size, seq_length
+print('Sample input: \n', sample_x)
+print()
+print('Sample label size: ', sample_y.size()) # batch_size
+print('Sample label: \n', sample_y)
+
+del dataiter
+del sample_x
+del sample_y
+del test_loader
+del train_loader
+del test_data
+del train_data
+
+
+#%%
+torch.cuda.empty_cache()
+torch.cuda.ipc_collect()
+predict = []
+val_losses = []
+mv_net.eval()
+
+for inputs, labels in val_loader:
         
-   
+        
+        if use_cuda:
+            inputs, labels = inputs.cuda(), labels.cuda()
+        
+    
+        mv_net.init_hidden(inputs.shape[0])
+        output = mv_net(inputs)
+        # print("The output shape is: {}. The target is shape: {} \n ******".format(output.shape, y_batch.shape))
+        t_loss = criterion(output.view(-1), labels.view(-1))
+        val_losses.append(t_loss.item())
+        predict.append(output.detach().to("cpu"))
+     
+#%%
+a = np.zeros((7,1))
+for i in np.arange(0,len(predict)):
+    a = np.concatenate((a, predict[i].numpy()), axis=0)
+#%%
+d1["pred_lstm"] = a
+b = d1.iloc[7,-1]
 
+d1.iloc[0:6,-1] = b
+#%%
+sns.displot(data = d1, x="pred_lstm", kind = "hist")
+sns.displot(data = d1, x="vel", kind = "hist")
+sns.displot(data = d1, x="pred_lstm", kind = "ecdf")
+sns.displot(data = d1, x="vel", kind = "ecdf")
+plt.show()
+sns.scatterplot(data=d1, x="vel", y = "pred_lstm", alpha=0.05, s=2)
+plt.show()
+x_vals = np.arange(0, len(d1))
+sns.scatterplot(x=x_vals, y=d1.vel, color = "r")
+sns.scatterplot(x=x_vals, y=d1.pred_lstm, color = "b")      
+plt.show()
 
+#%%
 
-
+sns.displot()
 #%%
 mv_net.train()
 # for t in range(train_episodes):
