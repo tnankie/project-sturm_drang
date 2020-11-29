@@ -53,7 +53,7 @@ d1["tr"] = d1.apply(lambda x: tracks[x.trasec], axis=1)
 d1 = d1.drop("trasec", axis =1)
 
 del tracks 
-d1 = d1.loc[d2.vel < 90]
+d1 = d1.loc[d1.vel < 90]
 
 import random
 import numpy as np

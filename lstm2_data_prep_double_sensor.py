@@ -215,12 +215,13 @@ print(new[:5])
 #%%
 d1 = pd.DataFrame(new)
 d1.iloc[:,-1] = pd.to_datetime(d1.iloc[:,-1], unit = "s", origin =off2)
-d1.set_index(d1.shape[1], inplace=True)
+d1.set_index(d1.shape[1] - 1, inplace=True)
 del new
 #%%
 
 mer = pd.merge(d1, tt_3, how = "left", sort = True, left_index=True, right_index=True)
 mer = mer.drop_duplicates()
+#%%
 mer = mer.loc[str(tt_3.index[0]):str(tt_3.index[-1])]
 mer = mer.fillna(method="backfill")
 mer.to_csv("./data/lstm_spectral_data_combined.csv")
