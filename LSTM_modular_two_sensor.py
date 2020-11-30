@@ -24,8 +24,8 @@ cols = d1.columns
 
 from sklearn.preprocessing import RobustScaler
 dy = d1.iloc[:,-2:]
-# dd = np.log(d1.iloc[:,:-2]+1)
-dd = d1.iloc[:,:-2]
+dd = np.log(d1.iloc[:,:-2]+1)
+# dd = d1.iloc[:,:-2]
 scaler = RobustScaler().fit(dd)
 d1 = scaler.transform(dd)
 d1 = pd.DataFrame(d1, columns = cols[:-2])
@@ -54,16 +54,19 @@ del tracks
 d1 = d1.loc[d1.vel < 90]
 
 #%%
+import matplotlib.pyplot as plt
+
+#%%
 # Parameters
-n_timesteps = 32 # this is number of timesteps was 200
+n_timesteps = 12 # this is number of timesteps was 200
 batch_size = 2 ** 10 # training batch size
 n_features = 512 # this is number of parallel inputs
-lstm_hidden = 30 # lstm hidden dimension size
-lstm_layers = 1 # number of lstm layers
-fc_hidden = 30 # size of hidden layers in fc network
-train_episodes = 5 # this is the number of epochs
-clip =  10000 # gradient clipping
-amd_lr = 1e-1
+lstm_hidden = 100 # lstm hidden dimension size
+lstm_layers = 2 # number of lstm layers
+fc_hidden = 1 # size of hidden layers in fc network
+train_episodes = 4000 # this is the number of epochs
+clip =  1 # gradient clipping
+amd_lr = 1e-3
 
 
 import random
@@ -134,6 +137,8 @@ sample_x, sample_y = dataiter.next()
 
 from LSTM_classes_functions import MV_LSTM4
 mv_net = MV_LSTM4(n_features, n_timesteps, lstm_hidden, lstm_layers, fc_hidden)
+# from LSTM_classes_functions import fc_net
+# mv_net = fc_net(n_features, n_timesteps, lstm_hidden, lstm_layers, fc_hidden)
 if use_cuda:
     mv_net.cuda()
 criterion = torch.nn.MSELoss() # reduction='sum' created huge loss value
@@ -160,14 +165,14 @@ for t in range(train_episodes):
     #    lstm_out, _ = mv_net.l_lstm(x_batch,nnet.hidden)    
     #    lstm_out.contiguous().view(x_batch.size(0),-1)
         output = mv_net(inputs)
-        print("The output shape is: {}. The target is shape: {} \n ******".format(output.shape, labels.shape))
+        # print("The output shape is: {}. The target is shape: {} \n ******".format(output.shape, labels.shape))
         t_loss = criterion(output.view(-1), labels.view(-1))  
         # print('counter : ' , counter , 'train loss : ' , t_loss.item())
         b_losses.append(t_loss.item())
         t_loss.backward()
         nn.utils.clip_grad_norm_(mv_net.parameters(), clip)
         optimizer.step()        
-        optimizer.zero_grad()
+        # optimizer.zero_grad()
         counter += 1
     print('step : ' , t , 'train loss : ' , t_loss.item())
     t_losses.append(t_loss.item())
@@ -183,7 +188,7 @@ for t in range(train_episodes):
     v_losses.append(v_loss.item())
 
 
-
+#%%
 q= 5 #first batch score to plot
 x_val = np.arange(0,len(v_losses))
 xb_val = np.arange(0,len(b_losses))/(len(b_losses)/len(v_losses))
@@ -192,14 +197,15 @@ title = "class: {}, batchsize: {}, timesteps: {}, first hidden layer: {}".format
 sns.scatterplot(x=x_val, y=v_losses, color= "r")
 sns.scatterplot(x=xb_val[q:], y=b_losses[q:], color= "g")
 sns.scatterplot(x=x_val, y=t_losses, color= "b").set_title(title)
-
-batch_size2 = 1000
+plt.show()
+batch_size2 = 20000
 test_loader2 = DataLoader(test_data, shuffle=False, batch_size=batch_size2)
 torch.cuda.empty_cache()
 torch.cuda.ipc_collect()
 predict = []
 val_losses = []
 mv_net.eval()
+
 
 for inputs, labels in test_loader2:
         
@@ -218,8 +224,12 @@ for inputs, labels in test_loader2:
 
 a = np.zeros((n_timesteps -1, 1))
 #b = np.zeros((7,1))
+
+
+
 for i in np.arange(0,len(predict)):
-    a = np.concatenate((a, predict[i].numpy()), axis=0)
+    print(i)
+    a = np.concatenate((a, predict[i].view(-1,1).numpy()), axis=0)
     # a = np.concatenate((a, b), axis=0)
 
 d2 = d1.iloc[69133:,:]
@@ -248,8 +258,65 @@ sns.scatterplot(x=x_vals[2 * mid :3 * mid], y=d2.vel.iloc[2 * mid :3 * mid], col
 sns.scatterplot(x=x_vals[2 * mid :3 * mid], y=d2.pred_lstm.iloc[2 * mid :3 * mid], color = "b")      
 plt.show()
 
+train_xp, train_yp = split_sequences(np.float32(d1.iloc[5000:15000,:-1].values), n_timesteps)
+train_datap = TensorDataset(torch.from_numpy(train_xp), torch.from_numpy(train_yp))
+test_loader3 = DataLoader(train_datap, shuffle=False, batch_size=batch_size2)
+torch.cuda.empty_cache()
+torch.cuda.ipc_collect()
+predict2 = []
+val_losses2 = []
+mv_net.eval()
 
 
+for inputs, labels in test_loader3:
+        
+        
+        if use_cuda:
+            inputs, labels = inputs.cuda(), labels.cuda()
+        
+    
+        mv_net.init_hidden(inputs.shape[0])
+        output = mv_net(inputs)
+        # print("The output shape is: {}. The target is shape: {} \n ******".format(output.shape, y_batch.shape))
+        t_loss = criterion(output.view(-1), labels.view(-1))
+        val_losses2.append(t_loss.item())
+      
+        predict2.append(output.detach().to("cpu"))
+
+aa = np.zeros((n_timesteps -1, 1))
+#b = np.zeros((7,1))
+
+
+for i in np.arange(0,len(predict2)):
+    print(i)
+    aa = np.concatenate((aa, predict2[i].view(-1,1).numpy()), axis=0)
+    # a = np.concatenate((a, b), axis=0)
+
+d3 = d1.iloc[5000:15000,:]
+d3["pred_lstm"] = aa
+bb = d3.iloc[n_timesteps -1,-1]
+
+d3.iloc[0:n_timesteps -2,-1] = bb
+
+
+import matplotlib.pyplot as plt
+sns.displot(data = d3, x="pred_lstm", kind = "hist")
+sns.displot(data = d3, x="vel", kind = "hist")
+sns.displot(data = d3, x="pred_lstm", kind = "ecdf")
+sns.displot(data = d3, x="vel", kind = "ecdf")
+plt.show()
+sns.scatterplot(data=d3, x="vel", y = "pred_lstm", alpha=0.05, s=2)
+plt.show()
+x_vals = np.arange(0, len(d3))
+sns.scatterplot(x=x_vals, y=d3.vel, color = "c")
+sns.scatterplot(x=x_vals, y=d3.pred_lstm, color = "m")      
+plt.show()
+mid = int(len(x_vals)/5)
+
+x_vals = np.arange(0, len(d3))
+sns.scatterplot(x=x_vals[2 * mid :3 * mid], y=d3.vel.iloc[2 * mid :3 * mid], color = "c")
+sns.scatterplot(x=x_vals[2 * mid :3 * mid], y=d3.pred_lstm.iloc[2 * mid :3 * mid], color = "m")      
+plt.show()
 
 #%%
 # # create NN
@@ -546,7 +613,7 @@ plt.show()
 # #             [...]
 
 
-
+#%%
 
 plot corelation of velocity and frequency (find the better predicting frequencies)
 min max scaler

@@ -7,10 +7,11 @@ Created on Sat Nov  7 12:03:48 2020
 import torch
 import numpy as np
 class fc_net(torch.nn.Module):
-    def __init__(self, n_features):
+    def __init__(self, n_features, seq_length =1, hidden = 30, layers = 2, fc_layer = 60):
         super(fc_net, self).__init__()
         self.n_features = n_features
-        self.n_hidden = 128 #512 original value
+        self.n_hidden = fc_layer #512 original value
+        self.n_layers = layers
         self.taper = 5 #30 original value
         self.l_linear1 = torch.nn.Linear(self.n_features, self.n_hidden)
         self.l_linear2 = torch.nn.Linear(self.n_hidden, self.n_hidden)
@@ -30,6 +31,11 @@ class fc_net(torch.nn.Module):
         x = m(x)
         x = self.l_linear5(x)
         return x
+    def init_hidden(self, batch_size):
+        hidden_state = torch.zeros(self.n_layers,batch_size,self.n_hidden).cuda()
+        cell_state = torch.zeros(self.n_layers,batch_size,self.n_hidden).cuda()
+        self.hidden = (hidden_state, cell_state)
+        
         
         
         
@@ -98,12 +104,12 @@ class MV_LSTM4(torch.nn.Module): #simplified fc layer
         # according to pytorch docs LSTM output is 
         # (batch_size,seq_len, num_directions * hidden_size)
         # when considering batch_first = True
-        self.drop1 = torch.nn.Dropout(0.1)
+        # self.drop1 = torch.nn.Dropout(0.1)
         # self.l_linear1 = torch.nn.Linear(self.n_hidden*self.seq_len, self.n_fc)
         self.l_linear1 = torch.nn.Linear(self.n_hidden, self.n_fc)
-        self.drop2 = torch.nn.Dropout(0.1)
-        self.l_linear2 = torch.nn.Linear(self.n_fc, self.n_fc)
-        self.l_linear3 = torch.nn.Linear(self.n_fc, 1)
+        # self.drop2 = torch.nn.Dropout(0.1)
+        # self.l_linear2 = torch.nn.Linear(self.n_fc, self.n_fc)
+        # self.l_linear3 = torch.nn.Linear(self.n_fc, 1)
         
     
     def init_hidden(self, batch_size):
@@ -123,13 +129,15 @@ class MV_LSTM4(torch.nn.Module): #simplified fc layer
         # .contiguous() -> solves tensor compatibility error
         m = torch.nn.Sigmoid()  # was relu
         x = lstm_out.contiguous().view(batch_size*self.seq_len,-1)
-        x = self.drop1(x)
+        # x = self.drop1(x)
         x = self.l_linear1(x)
-        x = self.drop2(x)
-        x = m(x)
-        x = self.l_linear2(x)
-        x = m(x)
-        x = self.l_linear3(x)
+        # x = self.drop2(x)
+        # x = m(x)
+        # x = self.l_linear2(x)
+        # x = m(x)
+        # x = self.l_linear3(x)
+        x = x.view(batch_size, -1)
+        x = x[:, -1] # get last batch of labels
         return x
     
 class MV_LSTM3(torch.nn.Module):
