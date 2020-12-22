@@ -109,7 +109,7 @@ class MV_LSTM4(torch.nn.Module): #simplified fc layer
         self.l_linear1 = torch.nn.Linear(self.n_hidden, self.n_fc)
         # self.drop2 = torch.nn.Dropout(0.1)
         # self.l_linear2 = torch.nn.Linear(self.n_fc, self.n_fc)
-        # self.l_linear3 = torch.nn.Linear(self.n_fc, 1)
+        self.l_linear3 = torch.nn.Linear(self.n_fc, 1)
         
     
     def init_hidden(self, batch_size):
@@ -127,15 +127,15 @@ class MV_LSTM4(torch.nn.Module): #simplified fc layer
         # (batch_size,seq_len,num_directions * hidden_size)
         # for following linear layer we want to keep batch_size dimension and merge rest       
         # .contiguous() -> solves tensor compatibility error
-        m = torch.nn.Sigmoid()  # was relu
+        m = torch.nn.ReLU()  # was relu
         x = lstm_out.contiguous().view(batch_size*self.seq_len,-1)
         # x = self.drop1(x)
         x = self.l_linear1(x)
         # x = self.drop2(x)
-        # x = m(x)
+        x = m(x)
         # x = self.l_linear2(x)
         # x = m(x)
-        # x = self.l_linear3(x)
+        x = self.l_linear3(x)
         x = x.view(batch_size, -1)
         x = x[:, -1] # get last batch of labels
         return x

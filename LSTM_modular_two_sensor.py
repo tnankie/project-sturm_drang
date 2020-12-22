@@ -58,13 +58,13 @@ import matplotlib.pyplot as plt
 
 #%%
 # Parameters
-n_timesteps = 12 # this is number of timesteps was 200
-batch_size = 2 ** 10 # training batch size
+n_timesteps = 16 # this is number of timesteps was 200
+batch_size = 2 ** 9 # training batch size
 n_features = 512 # this is number of parallel inputs
-lstm_hidden = 100 # lstm hidden dimension size
-lstm_layers = 2 # number of lstm layers
+lstm_hidden = 150 # lstm hidden dimension size
+lstm_layers = 5 # number of lstm layers
 fc_hidden = 1 # size of hidden layers in fc network
-train_episodes = 4000 # this is the number of epochs
+train_episodes = 60 # this is the number of epochs
 clip =  1 # gradient clipping
 amd_lr = 1e-3
 
@@ -172,7 +172,7 @@ for t in range(train_episodes):
         t_loss.backward()
         nn.utils.clip_grad_norm_(mv_net.parameters(), clip)
         optimizer.step()        
-        # optimizer.zero_grad()
+        optimizer.zero_grad()
         counter += 1
     print('step : ' , t , 'train loss : ' , t_loss.item())
     t_losses.append(t_loss.item())
@@ -188,7 +188,7 @@ for t in range(train_episodes):
     v_losses.append(v_loss.item())
 
 
-#%%
+
 q= 5 #first batch score to plot
 x_val = np.arange(0,len(v_losses))
 xb_val = np.arange(0,len(b_losses))/(len(b_losses)/len(v_losses))
@@ -616,5 +616,9 @@ plt.show()
 #%%
 
 plot corelation of velocity and frequency (find the better predicting frequencies)
-min max scaler
+# min max scaler
 then look at pure accelerometer data down down sampled by 1/3
+discrete time slices 0-10 11-20 etc Not 0-10 1-11 
+look at batch size again
+
+look at providing labels for all time steps in sequence length
